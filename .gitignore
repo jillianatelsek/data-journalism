@@ -35,5 +35,10 @@ vignettes/*.pdf
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 
+# DS Store
+.DS_Store
+.DS_store
+.ds_store
+
 # ignore large baltimore data
 arcos-md-baltimore-city-24510-itemized.tsv
