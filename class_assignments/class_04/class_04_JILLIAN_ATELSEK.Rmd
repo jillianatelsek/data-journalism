@@ -60,12 +60,15 @@ Generally, it's good practice to load packages you wish to work with at the begi
 **Task**: Create a code block below, write and execute the simple function to load the Tidyverse family of packages and the janitor package.  
 
 ``` {r}
-install.packages('janitor', repos = "http://cran.us.r-project.org")
-install.packages('tidyverse')
+#install.packages('janitor', repos = "http://cran.us.r-project.org")
+#install.packages('tidyverse')
+#install.packages("stringr")
 
 # Load Tidyverse and Janitor
 library(tidyverse)
 library(janitor)
+library(stringr)
+
 
 ```
 
@@ -186,14 +189,33 @@ In a comment inside the codeblock, put the name of the entity, the percentage of
 
 baltimore %>%
   group_by(buyer_name) %>%
-   summarise(total_pills = sum(dosage_unit)) %>%
-    arrange(desc(total_pills))
+   summarise(pills_per_pharmacy = sum(dosage_unit)) %>%
+    mutate(total_pills = sum(pills_per_pharmacy)) %>%
+      mutate(pills_percent = round((pills_per_pharmacy/total_pills)*100,2)) %>%
+        arrange(desc(pills_percent))
+      
+# The pharmacy that got the highest percentage of pills was RITE AID OF MARYLAND, INC. 12.52 percent of all pills shipped to Baltimore City were shipped to them. They received 16,740,590 pills, while the city as a whole received 133,721,503.	
 
 ```
 
 **Task**: Being a good data journalist who has worked with messy data, you are skeptical that the percentage you got for the last question -- "RITE AID of MARYLAND INC." -- truly represents all shipments to Rite Aid pharmacies in the city.  
 
-In a codeblock below, copy the function you wrote in your previous answer and add a filter at the end that returns only those records that have "RITE" in the name.  In a comment, explain how many different iterations of Rite Aid there are in this data set.  What prevented them from grouping correctly?  
+In a codeblock below, copy the function you wrote in your previous answer and add a filter at the end that returns only those records that have "RITE" in the name.  In a comment, explain how many different iterations of Rite Aid there are in this data set.  What prevented them from grouping correctly?
+
+``` {r}
+
+baltimore %>%
+  group_by(buyer_name, buyer_bus_act) %>%
+  summarise(pills_per_pharmacy = sum(dosage_unit)) %>%
+  mutate(total_pills = sum(pills_per_pharmacy)) %>%
+  mutate(pills_percent = pills_per_pharmacy/total_pills) %>%
+  arrange(desc(pills_percent)) %>%
+  filter(str_detect(buyer_name, "RITE"))
+
+# There are three different iterations of Rite Aid in this data set. They weren't grouped correctly because the names differ very slightly: One has a commma and a period, one has neither, and one has a comma and "T/A" at the end.
+
+  
+```
 
 **Task**: Create a codeblock below that does the following.
 
@@ -205,6 +227,32 @@ In a codeblock below, copy the function you wrote in your previous answer and ad
 
 In a comment inside the codeblock, explain how many total shipments there were to the city, how many and what percentage went to Rite Aid stores. 
 
+``` {r}
+
+
+baltimore <- baltimore %>%
+   mutate(rite_aid_y_n = case_when(
+    buyer_name == "RITE AID OF MARYLAND INC" ~ "rite_aid_y" ,
+    buyer_name == "RITE AID OF MARYLAND, INC T/A" ~ "rite_aid_y" ,
+    buyer_name == "RITE AID OF MARYLAND, INC." ~ "rite_aid_y",
+    TRUE ~ "rite_aid_n"))
+
+
+```
+
+``` {r}
+
+baltimore %>%
+  group_by(rite_aid_y_n) %>%
+  summarise(shipments = n()) %>%
+  mutate(total_shipments = sum(shipments)) %>%
+  mutate(percent_shipments = shipments/total_shipments)
+
+# There were 290908 shipments to Baltimore City, and 15.1 percent of them went to Rite Aid stores.
+
+```
+
+
 **Task**: Create a summary table with the following information:
 
 * Looks only at Hydrodocode pills
@@ -214,14 +262,113 @@ In a comment inside the codeblock, explain how many total shipments there were t
 
 In a comment, write up your findings.  What information would you use to spur additional reporting? 
 
+``` {r}
+
+baltimore_hyd <- baltimore %>%
+  filter(drug_name == "HYDROCODONE")
+
+```
+
+``` {r}
+
+baltimore_hyd_pipeline <- baltimore_hyd %>%
+  select(combined_labeler_name, reporter_name, buyer_name, dosage_unit, transaction_date) %>%
+  unite(pipeline, combined_labeler_name, reporter_name, buyer_name, remove='F', sep = "--") %>%
+  group_by(pipeline) %>%
+  summarise(shipments = n(),
+    total_pills = sum(dosage_unit),
+    avg_pills_per_shipments = mean(dosage_unit),
+    max_pills_in_shipments = max(dosage_unit)
+  )
+
+# The pipeline that handled the most shipments and the most pills was SpecGx LLC--RITE AID MID-ATLANTIC--RITE AID OF MARYLAND, INC. The pipeline with the highest number of pills handled per shipment, on average, was Actavis Pharma, Inc.--CARDINAL HEALTH--NEWCARE HOME HEALTH SERVICES. I would look at all of these entities to spur additional reporting and see why their numbers were so high.
+
+```
+
+
 **Task**: The discovery, in the previous question, that there was at least one shipment of Hydrocodone from Actavis Pharma to Cardinal Health to NewCare Home Health Services of 48,000 pills prompts you to want to learn more.  On what date did this transactions take place? Write the code you'd use in a codeblock below. In a comment, put the date.
+
+``` {r}
+
+baltimore %>%
+  filter(dosage_unit > 47000) %>%
+  select(transaction_date, dosage_unit)
+
+# March 21, 2006.
+
+```
+
 
 ## Further analysis
 
-**Task**: Based on your initial analysis, NewCare Home Health Services seems worthy of additional digging.  You set out to learn as much as you can about their patterns.  Use everything you've learned to get at these or other questions:What were their buying patterns like?  Did they concentrate on buying certain kinds of pills? Were they buying greater numbers of high dose opioids, compared to others? Who made most of the pills they got?  Who distributed them?
+**Task**: Based on your initial analysis, NewCare Home Health Services seems worthy of additional digging.  You set out to learn as much as you can about their patterns.  Use everything you've learned to get at these or other questions: What were their buying patterns like?  Did they concentrate on buying certain kinds of pills? Were they buying greater numbers of high dose opioids, compared to others? Who made most of the pills they got?  Who distributed them?
 
 Create four separate codeblocks below. Ask and answer at least four separate questions.  
 
+``` {r}
+
+# Q: Who made most of the pills Newcare got?
+
+baltimore %>%
+  select(combined_labeler_name, buyer_name, dosage_unit) %>%
+  group_by(combined_labeler_name) %>%
+  filter(buyer_name == "NEWCARE HOME HEALTH SERVICES") %>%
+  summarise(pills_per_pharmacy = sum(dosage_unit)) %>%
+  arrange(desc(pills_per_pharmacy))
+  
+# A: Actavis Pharma.
+
+```
+
+``` {r}
+
+# Q: What percent of pills sent to Newcare came from Actavis?
+
+baltimore %>%
+  select(combined_labeler_name, buyer_name, dosage_unit) %>%
+  group_by(combined_labeler_name) %>%
+  filter(buyer_name == "NEWCARE HOME HEALTH SERVICES") %>%
+  summarise(pills_per_pharmacy = sum(dosage_unit)) %>%
+  mutate(total_pills = sum(pills_per_pharmacy)) %>%
+  mutate(pills_percent = pills_per_pharmacy/total_pills) %>%
+  arrange(desc(pills_percent))
+
+# A: 97 percent. 
+
+```
+
+```{r}
+
+# Q: Which distributor sent the most pills to Newcare?
+
+baltimore %>%
+  select(reporter_name, buyer_name, dosage_unit) %>%
+  group_by(reporter_name) %>%
+  filter(buyer_name == "NEWCARE HOME HEALTH SERVICES") %>%
+  summarise(pills_per_pharmacy = sum(dosage_unit)) %>%
+  arrange(desc(pills_per_pharmacy))
+
+# A: Anda Pharmaceuticals Inc. 
+
+```
+
+```{r}
+
+# How many pills per shipment did Newcare get on average?
+
+
+baltimore %>%
+  select(buyer_name, dosage_unit) %>%
+  filter(buyer_name == "NEWCARE HOME HEALTH SERVICES") %>%
+   mutate(shipments = n(),
+    total_pills = sum(dosage_unit),
+    avg_pills_per_shipments = mean(dosage_unit)
+)
+
+# A: 4375.
+
+```
+  
 ## Output
 
 **Task**: Spellcheck your document in R Studio.  Save your file.  Knit it to an HTML document, making sure it compiles.  Open it in a browser to be sure. Push your changes to GitHub, and go to GitHub.com to make sure your changes got up to the browser. 
