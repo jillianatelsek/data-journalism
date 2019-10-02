@@ -144,7 +144,7 @@ baltimore %>%
    summarise(total_pills = sum(dosage_unit)) %>%
     arrange(desc(total_pills))
 
-# WRITE A PARAGRAPH ABOUT IT 
+# The DEA and Maryland sued Newcare, and it was convicted for 2008 of selling almost 10 million units of hydrocodone illegally over the Internet to anyone with a valid credit card. They were paid for each perscription they filled by a small group of doctors.
 
 ```
 
