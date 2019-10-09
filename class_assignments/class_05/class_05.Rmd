@@ -177,18 +177,22 @@ Here's how I'd proceed, in order:
 
 ``` {r}
 
+# join buyer addresses with buyer totals by dea number, and return only records for which there's a total match
 buyer_totals %>%
   inner_join(buyer_addresses, by="buyer_dea_no")
 
-
+# join the the two sets by dea number, but return only records for which there is a match in the buyer_totals field
 buyer_totals %>%
   left_join(buyer_addresses, by="buyer_dea_no")
 
+# same as above, but only show records where the address field is empty
 buyer_totals %>%
   left_join(buyer_addresses, by="buyer_dea_no") %>%
   filter(buyer_address1 =="na")
+```
 
-
+```{r}
+anti_join(buyer_totals, buyer_addresses, by = "buyer_dea_no")
 
 ```
 
