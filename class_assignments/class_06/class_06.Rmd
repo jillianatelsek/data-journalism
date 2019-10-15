@@ -61,11 +61,14 @@ Run this:
 ```{r}
 # If you don't have one or both of these these, use install.packages()
 
-# install.packages('arcos')
-library(tidyverse)
-library(janitor)
-library(lubridate)
-library(arcos)
+#install.packages('arcos')
+#install.packages('curl')
+
+#library(tidyverse)
+#library(janitor)
+#library(lubridate)
+#library(arcos)
+library(curl)
 ```
 
 ## Load Data
@@ -143,10 +146,36 @@ There are many other ways the data is stored that you can access through the ARC
 
 Caution: do NOT use the raw_data() function, it will almost certainly crash your computer. 
 
+```{r}
+
+state_population(2006)
+
+buyer_details(county="Frederick", state="MD", key=key)	
+
+summarized_county_monthly(county="Frederick", state="MD", key=key)	
+
+```
+
 ## Analysis
 
 **Task** Use the rest of class to start doing exploratory queries for your data analysis project.  Do at least 5 queries to get started. I'll come around and talk to you about your ideas.  
 
+``` {r}
+
+PG_annual <- combined_buyer_annual(county="Prince Georges", state="MD", key=key)
+
+PG_details <-buyer_details(county = "Prince Georges", state="MD", key=key)
+
+PG_complete <- PG_annual %>%
+  inner_join(PG_details, by="BUYER_DEA_NO")
+
+```
+
+
+``` {r}
+
+
+```
 ## Output
 
 **Task**: Spellcheck your document in R Studio.  Save your file.  Knit it to an HTML document, making sure it compiles.  Open it in a browser to be sure. Push your changes to GitHub, and go to GitHub.com to make sure your changes got up to the browser.
