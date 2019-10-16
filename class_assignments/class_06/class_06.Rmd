@@ -64,10 +64,10 @@ Run this:
 #install.packages('arcos')
 #install.packages('curl')
 
-#library(tidyverse)
-#library(janitor)
-#library(lubridate)
-#library(arcos)
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(arcos)
 library(curl)
 ```
 
@@ -161,18 +161,17 @@ summarized_county_monthly(county="Frederick", state="MD", key=key)
 **Task** Use the rest of class to start doing exploratory queries for your data analysis project.  Do at least 5 queries to get started. I'll come around and talk to you about your ideas.  
 
 ``` {r}
+#PG_annual <- combined_buyer_annual(county="Prince Georges", state="MD", key=key)
 
-PG_annual <- combined_buyer_annual(county="Prince Georges", state="MD", key=key)
+#PG_details <-buyer_details(county = "Prince Georges", state="MD", key=key)
 
-PG_details <-buyer_details(county = "Prince Georges", state="MD", key=key)
+#PG_complete <- PG_annual %>%
+  #inner_join(PG_details, by="BUYER_DEA_NO")
+  
 
-PG_complete <- PG_annual %>%
-  inner_join(PG_details, by="BUYER_DEA_NO")
-
-```
-
-
-``` {r}
+PG_complete %>%
+  filter(BUYER_CITY=="COLLEGE PARK") %>%
+  arrange(desc(DOSAGE_UNIT))
 
 
 ```
