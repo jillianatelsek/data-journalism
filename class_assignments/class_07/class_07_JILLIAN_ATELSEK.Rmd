@@ -60,8 +60,8 @@ We're also going to load a new package, [tidycensus](https://walkerke.github.io/
 
 **Task**: In the code block below, load the six packages we'll need for today. Install packages if necessary. 
 ```{r}
-install.packages("ggrepel")
-install.packages("tidycensus")
+#install.packages("ggrepel")
+#install.packages("tidycensus")
 
 library(tidyverse)
 library(janitor)
@@ -249,20 +249,50 @@ ggplot(md_2012) +
 
 ```{r}
 
-last_question <- 
-arcos_county_pills_per_year %>%
-  filter(buyer_state == "MD", (buyer_county %in% c("KANAWHA", "CABELL", "MINGO", "RALEIGH","LOGAN", "WOOD"))) %>%
-  select(buyer_county, year, dosage_unit)
+last_question <- arcos_county_pills_per_year %>%
+  filter(buyer_state == "MD") %>%
+  select(buyer_county, year, dosage_unit, countyfips)
 
-ggplot(wv_counties_pills_per_year) +
-  geom_bar(stat="identity", aes(year, dosage_unit, fill=buyer_county)) +
-  labs(x="Year", y="Total pills", title="Steady rise in opioids in Kanawha and Raleigh counties", subtitle = "Total pills per year shipped to Kanawha, Cabell, Mingo, Raleigh, Logan and Wood counties", caption = "Source: DEA ARCOS database, via Washington Post", fill="County") +
+```
+
+```{r}
+md_counties_population <-county_population(key = key) %>%
+  clean_names() %>%
+  filter(buyer_state == "MD") %>%
+  select(buyer_county, year, population, countyfips)
+
+```
+  
+```{r}
+
+last_question_graphic <- last_question %>%
+   full_join(md_counties_population)
+
+
+last_question_graphic <- last_question_graphic %>%
+  mutate(pills_per_person = dosage_unit/population)
+```
+
+```{r}
+
+last_question_graphic <-
+  last_question_graphic %>%
+  filter(buyer_county %in% c("KENT", "ALLEGANY", "WASHINGTON", "WICOMICO", "WORCESTER", "HARFORD"))
+
+```
+
+```{r}
+options(scipen=999)
+
+
+ggplot(last_question_graphic) +
+  geom_bar(stat="identity", aes(year, pills_per_person, fill=buyer_county)) +
+  labs(x="Year", y="Total pills per capita", title="Kent and Allegany counties received most pills per person", subtitle = "Total pills per capita per year shipped to Allegany, Harford, Kent, \nWashington, Wicomico and Worcester counties", caption = "Source: DEA ARCOS database, via Washington Post", fill="County") +
   scale_x_continuous(breaks = c(2006, 2007, 2008, 2009, 2010, 2011, 2012)) +
   scale_y_continuous(labels = comma) +
   facet_wrap(nrow=2, . ~ buyer_county) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   guides(fill="none")
-  
 ```
 
 ## Submission
