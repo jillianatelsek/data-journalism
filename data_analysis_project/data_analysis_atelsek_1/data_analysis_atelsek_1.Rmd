@@ -1,0 +1,291 @@
+---
+title: "data_analysis_atelsek_1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+#install.packages("data.table")
+
+# Loading packages
+
+library(tidyverse)
+library(janitor)
+library(arcos)
+library(tidycensus)
+library(mapview)
+library(ggthemes)
+library(scales)
+library(data.table)
+
+```
+
+```{r}
+
+# Reading data
+
+hiv.data <- read.csv("data/HIV_DATA.csv") %>%
+  clean_names()
+
+```
+
+```{r}
+
+# Storing one of our API keys as an object called key
+key <- "uO4EK6I"
+
+```
+
+```{r}
+
+arcos_county_pills_per_year <- summarized_county_annual(key = key) %>%
+  clean_names()
+
+```
+
+```{r}
+
+# Removing unecessary columns from the HIV dataset
+
+hiv.data <-
+  select(hiv.data,-c(i_indicator))
+
+```
+
+```{r}
+
+# Q1: Which county had the highest rate of HIV diagnoses? When?
+
+hiv.data %>%
+  arrange(desc(rate_per_100000))
+
+# Problem: Tons of the counties have an entry that just says "data suppressed" for number of cases and rate per 100,000 people.
+
+
+```
+
+``` {r}
+
+# Q2: My new question is -- how many counties have "data suppressed" as their value?
+
+hiv.data %>%
+  filter(cases=="Data suppressed")
+
+# Answer: 7,620. That's a pretty significant number and might pose a problem with my project.
+
+
+```
+
+
+``` {r}
+
+# Q3: How many counties have a rate of 0?
+
+hiv.data %>%
+  filter(cases=="0")
+
+# A: 1,161.
+
+
+
+```
+
+
+```{r}
+
+# Getting rid of the "data suppressed" counties
+
+hiv.data <- hiv.data %>%
+    filter(cases != "Data suppressed")
+
+```
+
+
+``` {r}
+
+# Q4 (really just Q1 again): Which county/year combination had the highest rate of HIV diagnoses?
+
+hiv.data %>%
+  arrange(desc(rate_per_100000))
+
+# A: Calhoun County, GA, in 2008.
+
+```
+
+``` {r}
+
+# The ARCOS database only covers the years 2006-2012. I'm going to remove the years that don't match up from the HIV data. For some reason it isn't working when I list the years I want to remove, so I guess I'll just do it four times.
+
+hiv.data <- hiv.data %>%
+  filter(year != 2016)
+
+hiv.data <- hiv.data %>%
+  filter(year != 2015)
+
+hiv.data <- hiv.data %>%
+  filter(year != 2014)
+
+hiv.data <- hiv.data %>%
+  filter(year != 2013)
+
+# The HIV database doesn't have 2006 or 2007. I'm going to remove those from the ARCOS database. (This is the easier way to do that.)
+
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
+  filter(year !=2006) %>%
+  filter(year !=2007)
+
+```
+
+``` {r}
+
+# Converting fips columns to the same type to avoid join error
+
+
+glimpse(hiv.data)
+glimpse(arcos_county_pills_per_year)
+
+
+```
+
+``` {r}
+
+hiv.data <- hiv.data %>%  
+    mutate(fips = as.character(fips))
+
+```
+
+```{r}
+
+hiv_and_pills <- hiv.data %>%
+  inner_join(arcos_county_pills_per_year, by = c("fips" = "countyfips"))
+
+```
+
+
+```{r}
+
+# Q5: How many counties do we have data for once we do the join? 
+ 
+# A: 11,344. That's less than half of what we started with. Seems problematic. Maybe I will have to     focus on one state? Or a handful of states?
+
+# Now I want to figure out how to get rid of the unnecessary columns. 
+
+hiv_and_pills <- hiv_and_pills %>%
+  subset(select = -c(year.x,buyer_state))
+
+```
+
+```{r}
+
+hiv_and_pills <- hiv_and_pills %>%
+  subset(select = -c(buyer_county))
+
+```
+
+```{r}
+#
+#Now I want to clean up the column names and rearrange their order. 
+
+hiv_and_pills %>%
+  #setnames(old=c("rate_per_100000"), new=c("hiv_rate")) 
+  #setnames(old=c("year.y"), new=c("year")) 
+  #setnames(old=c("count"), new=c("shipments")) 
+  #setnames(old=c("cases"), new=c("hiv_cases")) 
+
+```
+
+```{r}
+
+hiv_and_pills <- hiv_and_pills[c("fips", "county", "state", "year", "shipments", "dosage_unit", "hiv_cases", "hiv_rate", "population")]
+
+```
+
+```{r}
+
+# Make a column for pills per person.
+
+
+#hiv_and_pills <- hiv_and_pills %>% 
+   #mutate(population = as.(population))
+
+#glimpse(hiv_and_pills)
+
+
+#hiv_and_pills <- hiv_and_pills %>%
+ #mutate(pills_per_person=dosage_unit/population)
+
+
+
+```
+
+```{r}
+
+#Q6: Which county had the most pills per person during this time?
+
+hiv_and_pills %>%
+  arrange(desc(pills_per_person))
+
+# A: According to that code, it was Oakland County, MI. However, I do not trust this, because its population is listed as 4. How could a county with 4 people have 1,398 cases of HIV in 2012? There is clearly a problem here. I do not know what it is.
+
+
+```
+
+```{r}
+
+#Q7: What the hell is wrong with the population column? In the original HIV dataset, Oakland County had a population of more than 1,000,000. Now, it says it has a population of 4. Something clearly went wrong with the join. 
+
+hiv.data %>%
+  arrange(desc(population))
+
+# OKAY so it might be because the population was listed as a "factor" column in the OG dataset. Let me go back and fix that and try everything again. 
+
+# UPDATE: This mutation of the population and dosage_units column is clearly breaking everything. It has something to do with the way the population column is formatted. I've been on stackoverflow and other sites for close to an hour, and can't figure out why it's messing everything up. That will have to wait until later. (I went back and commented that last chunk out.)
+
+# What I did figure out, though, is that the join is messed up because the CSV axed off any "0"s that led off a FIPS code. I'm going to try and fix that.
+
+# UPDATE (about an hour after the last update): After an absolutely hellish process, I have come to the conclusion that I will need Sean's help to figure out this issue with the FIPS code. For now, I'll analyze all the results I am able to get with the join.
+
+```
+
+```{r}
+
+# Q8: Which county had the highest rate of HIV diagnoses in 2012?
+
+hiv_and_pills %>%
+  filter(year=="2012") %>%
+  arrange(desc(hiv_rate))
+
+# A: Calhoun County, GA.
+
+```
+
+```{r}
+
+#Q9: Is there any HIV rate pattern when this data is grouped by state in the year 2012?
+
+hiv_and_pills %>%
+  filter(year=="2012") %>%
+  group_by(state) 
+
+# A: It's hard to tell, and this clearly isn't perfect code for the job. I'm going to try a different approach.
+
+```
+
+```{r}
+
+# Q10: I'm going to zero in on some specific states. What was up with Florida in 2012?
+
+hiv_and_pills %>%
+  filter(year=="2012", state=="FL") %>%
+  arrange(desc(hiv_rate))
+
+
+# A: Something is wrong with these columns, yet again. Looks like they are factors, which means they can't be properly sorted in a numeric way. But every time I try to fix that, the numbers get clearly skewed.
+
+```
+
+
