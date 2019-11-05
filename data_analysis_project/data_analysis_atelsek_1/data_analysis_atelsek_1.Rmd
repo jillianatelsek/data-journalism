@@ -9,7 +9,17 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 
+#Installing packages
+
 #install.packages("data.table")
+#install.packages("tidyverse")
+#install.packages("janitor")
+#install.packages("arcos")
+#install.packages("tidycensus")
+#install.packages("mapview")
+#install.packages("ggthemes")
+#install.packages("scales")
+
 
 # Loading packages
 
@@ -26,93 +36,120 @@ library(data.table)
 
 ```{r}
 
+# Importing and cleaning HIV data
+
 # Reading data
 
-hiv.data <- read.csv("data/HIV_DATA.csv") %>%
-  clean_names()
+hiv.data.1 <- read_csv("data/HIV_DATA.csv")
+                     
+```
+
+```{r}
+
+# Reading data again
+
+hiv.data.2 <- read.csv("data/HIV_DATA.csv")
 
 ```
 
 ```{r}
 
-# Storing one of our API keys as an object called key
-key <- "uO4EK6I"
+
+# Removing all counties for which HIV data was suppressed
+
+hiv.data.1 <- hiv.data.1 %>%
+  filter(Cases != "Data suppressed")
+
+hiv.data.2 <- hiv.data.2 %>%
+  filter(Cases != "Data suppressed")
+
+
+
+# Removing unecessary columns from each dataframe to simplify the join
+
+hiv.data.1 <- 
+  select(hiv.data.1,-c(Geography, Indicator, Population))
+
+hiv.data.2 <- 
+  select(hiv.data.2, -c(Geography, Indicator, FIPS, Cases, Rate.per.100000))
+
+
+```
+
+
+```{r}
+
+# Merging hiv.data.1 (which has accurate FIPS code information) and hiv.data.2 (which has accurate population information)
+
+hiv.data <- merge(hiv.data.1, hiv.data.2, by=c("Year","County", "State")) 
+
+# SUCCESS 
+
+# Making column names lowercase
+
+hiv.data <- clean_names(hiv.data)
 
 ```
 
 ```{r}
 
-arcos_county_pills_per_year <- summarized_county_annual(key = key) %>%
-  clean_names()
+# Renaming columns to make the dataframe easier to read
+
+ hiv.data <- hiv.data %>% 
+  setnames(old=c("rate_per_100000"), new=c("hiv_rate_per_100k")) %>%
+  setnames(old=c("cases"), new=c("hiv_cases")) 
+
 
 ```
 
 ```{r}
 
-# Removing unecessary columns from the HIV dataset
+# Q1: How many counties had "data suppressed" as their value?
 
-hiv.data <-
-  select(hiv.data,-c(i_indicator))
+hiv.data.raw <- read.csv("data/HIV_DATA.csv")
+
+hiv.data.raw %>%
+  filter(Cases=="Data suppressed")
+
+# Answer: 7,620. That's a pretty significant number, and it might become a problem later on in the project.
 
 ```
 
 ```{r}
 
-# Q1: Which county had the highest rate of HIV diagnoses? When?
+# Q2: Which county had the highest rate of HIV diagnoses? When?
 
 hiv.data %>%
-  arrange(desc(rate_per_100000))
+  arrange(desc(hiv_rate_per_100k))
 
-# Problem: Tons of the counties have an entry that just says "data suppressed" for number of cases and rate per 100,000 people.
-
-
-```
-
-``` {r}
-
-# Q2: My new question is -- how many counties have "data suppressed" as their value?
-
-hiv.data %>%
-  filter(cases=="Data suppressed")
-
-# Answer: 7,620. That's a pretty significant number and might pose a problem with my project.
-
+# A: Calhoun County, GA, in 2008. 
 
 ```
-
 
 ``` {r}
 
 # Q3: How many counties have a rate of 0?
 
 hiv.data %>%
-  filter(cases=="0")
+  filter(hiv_cases=="0")
 
 # A: 1,161.
 
 
-
 ```
-
 
 ```{r}
 
-# Getting rid of the "data suppressed" counties
+# Loading in ARCOS opioid data
 
-hiv.data <- hiv.data %>%
-    filter(cases != "Data suppressed")
+# Storing one of our API keys as an object called key
 
-```
+key <- "uO4EK6I"
 
+# Pull down ARCOS data for pills per county per year
 
-``` {r}
-
-# Q4 (really just Q1 again): Which county/year combination had the highest rate of HIV diagnoses?
-
-hiv.data %>%
-  arrange(desc(rate_per_100000))
-
-# A: Calhoun County, GA, in 2008.
+arcos_county_pills_per_year <- summarized_county_annual(key = key) %>%
+  clean_names()
 
 ```
 
@@ -132,36 +169,39 @@ hiv.data <- hiv.data %>%
 hiv.data <- hiv.data %>%
   filter(year != 2013)
 
-# The HIV database doesn't have 2006 or 2007. I'm going to remove those from the ARCOS database. (This is the easier way to do that.)
+# The HIV database doesn't have 2006 or 2007. I'm going to remove those from the ARCOS database.
 
 arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
-  filter(year !=2006) %>%
+  filter(year !=2006) 
+  
+  
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>% 
   filter(year !=2007)
-
-```
-
-``` {r}
-
-# Converting fips columns to the same type to avoid join error
-
-
-glimpse(hiv.data)
-glimpse(arcos_county_pills_per_year)
-
-
-```
-
-``` {r}
-
-hiv.data <- hiv.data %>%  
-    mutate(fips = as.character(fips))
 
 ```
 
 ```{r}
 
-hiv_and_pills <- hiv.data %>%
-  inner_join(arcos_county_pills_per_year, by = c("fips" = "countyfips"))
+# Changing names in ARCOS dataframe to match HIV dataframe
+
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>% 
+  #setnames(old=c("buyer_state"), new=c("state"))
+  setnames(old=c("buyer_county"), new=c("county"))
+
+
+# Removing FIPS from ARCOS dataframe
+
+  arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
+  subset(select = -c(countyfips))
+
+
+```
+
+```{r}
+
+# Joining HIV data with ARCOS data
+
+hiv_and_pills <- merge(hiv.data, arcos_county_pills_per_year, by=c("year","county", "state")) 
 
 ```
 
